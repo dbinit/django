@@ -3,7 +3,7 @@ from django.conf import settings
 from django.test import TestCase
 
 from models import (User, UserProfile, UserStat, UserStatResult, StatDetails,
-    AdvancedUserStat, Image, Product)
+    AdvancedUserStat, Image, Product, Parent1, Parent2, Child1, Child2)
 
 class ReverseSelectRelatedTestCase(TestCase):
     def setUp(self):
@@ -20,6 +20,14 @@ class ReverseSelectRelatedTestCase(TestCase):
         advstat = AdvancedUserStat.objects.create(user=user2, posts=200, karma=5,
                                                   results=results2)
         StatDetails.objects.create(base_stats=advstat, comments=250)
+        p1 = Parent1(name1="Only Parent1")
+        p1.save()
+        c1 = Child1(name1="Child1 Parent1", name2="Child1 Parent2")
+        c1.save()
+        p2 = Parent2(name2="Child2 Parent2")
+        p2.save()
+        c2 = Child2(name1="Child2 Parent1", parent2=p2)
+        c2.save()
 
     def test_basic(self):
         def test():
@@ -88,3 +96,16 @@ class ReverseSelectRelatedTestCase(TestCase):
         p2 = Product.objects.create(name="Talking Django Plushie")
 
         self.assertEqual(len(Product.objects.select_related("image")), 2)
+
+    def test_parent_only(self):
+        Parent1.objects.select_related('child1').get(name1="Only Parent1")
+
+    def test_multiple_subclass(self):
+        with self.assertNumQueries(1):
+            p = Parent1.objects.select_related('child1').get(name1="Child1 Parent1")
+            self.assertEqual(p.child1.name2, u"Child1 Parent2")
+
+    def test_onetoone_with_subclass(self):
+        with self.assertNumQueries(1):
+            p = Parent2.objects.select_related('child2').get(name2="Child2 Parent2")
+            self.assertEqual(p.child2.name1, u"Child2 Parent1")

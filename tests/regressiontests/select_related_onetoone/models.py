@@ -45,6 +45,7 @@ class StatDetails(models.Model):
 class AdvancedUserStat(UserStat):
     karma = models.IntegerField()
 
+
 class Image(models.Model):
     name = models.CharField(max_length=100)
 
@@ -52,3 +53,28 @@ class Image(models.Model):
 class Product(models.Model):
     name = models.CharField(max_length=100)
     image = models.OneToOneField(Image, null=True)
+
+
+class Parent1(models.Model):
+    name1 = models.CharField(max_length=50)
+    def __unicode__(self):
+        return self.name1
+
+
+class Parent2(models.Model):
+    name2 = models.CharField(max_length=50)
+    def __unicode__(self):
+        return self.name2
+
+
+class Child1(Parent1, Parent2):
+    other = models.CharField(max_length=50)
+    def __unicode__(self):
+        return self.name1
+
+
+class Child2(Parent1):
+    parent2 = models.OneToOneField(Parent2)
+    other = models.CharField(max_length=50)
+    def __unicode__(self):
+        return self.name1

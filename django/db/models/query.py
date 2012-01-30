@@ -1238,7 +1238,7 @@ class EmptyQuerySet(QuerySet):
     value_annotation = False
 
 def get_klass_info(klass, max_depth=0, cur_depth=0, requested=None,
-                   only_load=None, local_only=False):
+                   only_load=None, local_only=False, last_klass=None):
     """
     Helper function that recursively returns an information for a klass, to be
     used in get_cached_row.  It exists just to compute this information only
@@ -1260,6 +1260,8 @@ def get_klass_info(klass, max_depth=0, cur_depth=0, requested=None,
        the full field list for `klass` can be assumed.
      * local_only - Only populate local fields. This is used when
        following reverse select-related relations
+     * last_klass - the last class seen when following reverse
+       select-related relations
     """
     if max_depth and requested is None and cur_depth > max_depth:
         # We've recursed deeply enough; stop now.
@@ -1305,8 +1307,14 @@ def get_klass_info(klass, max_depth=0, cur_depth=0, requested=None,
         # But kwargs version of Model.__init__ is slower, so we should avoid using
         # it when it is not really neccesary.
         if local_only and len(klass._meta.local_fields) != len(klass._meta.fields):
-            field_count = len(klass._meta.local_fields)
-            field_names = [f.attname for f in klass._meta.local_fields]
+            parents = [p for p in klass._meta.get_parent_list()
+                       if p is not last_klass]
+            field_names = [f.attname for f in klass._meta.fields
+                           if f in klass._meta.local_fields
+                           or f.model in parents]
+            field_count = len(field_names)
+            if field_count == len(klass._meta.fields):
+                field_names = ()
         else:
             field_count = len(klass._meta.fields)
             field_names = ()
@@ -1330,7 +1338,8 @@ def get_klass_info(klass, max_depth=0, cur_depth=0, requested=None,
             if o.field.unique and select_related_descend(o.field, restricted, requested, reverse=True):
                 next = requested[o.field.related_query_name()]
                 klass_info = get_klass_info(o.model, max_depth=max_depth, cur_depth=cur_depth+1,
-                                            requested=next, only_load=only_load, local_only=True)
+                                            requested=next, only_load=only_load, local_only=True,
+                                            last_klass=klass)
                 reverse_related_fields.append((o.field, klass_info))
 
     return klass, field_names, field_count, related_fields, reverse_related_fields
@@ -1416,7 +1425,7 @@ def get_cached_row(row, index_start, using,  klass_info, offset=0):
                 # Now populate all the non-local field values
                 # on the related object
                 for rel_field, rel_model in rel_obj._meta.get_fields_with_model():
-                    if rel_model is not None:
+                    if rel_model is not None and isinstance(obj, rel_model):
                         setattr(rel_obj, rel_field.attname, getattr(obj, rel_field.attname))
                         # populate the field cache for any related object
                         # that has already been retrieved

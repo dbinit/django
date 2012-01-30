@@ -724,7 +724,11 @@ class Model(object):
             # Exclude the current object from the query if we are editing an
             # instance (as opposed to creating a new one)
             if not self._state.adding and self.pk is not None:
-                qs = qs.exclude(pk=self.pk)
+                if model_class is self.__class__:
+                    pk = self.pk
+                else:
+                    pk = getattr(self, self._meta.get_ancestor_link(model_class).attname)
+                qs = qs.exclude(pk=pk)
 
             if qs.exists():
                 if len(unique_check) == 1:
